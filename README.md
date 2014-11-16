@@ -32,7 +32,7 @@ IO, File module for mruby
 | IO#binmode?                |          |      |
 | IO#bytes                   |          | obsolete |
 | IO#chars                   |          | obsolete |
-| IO#clone, IO#dup           |          |      |
+| IO#clone, IO#dup           |    o     |      |
 | IO#close                   |    o     |      |
 | IO#close_on_exec=          |    o     |      |
 | IO#close_on_exec?          |    o     |      |
