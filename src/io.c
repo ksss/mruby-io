@@ -329,6 +329,54 @@ mrb_io_initialize(mrb_state *mrb, mrb_value io)
   return io;
 }
 
+static int
+mrb_dup(mrb_state *mrb, int fd)
+{
+  int new_fd;
+
+  if (fd < 0)
+    return fd;
+
+  new_fd = dup(fd);
+  if (new_fd == -1)
+    mrb_sys_fail(mrb, "dup faield.");
+  return new_fd;
+}
+
+mrb_value
+mrb_io_initialize_copy(mrb_state *mrb, mrb_value copy)
+{
+  mrb_value orig;
+  mrb_value buf, pos;
+  struct mrb_io *fptr_copy;
+  struct mrb_io *fptr_orig;
+
+  mrb_get_args(mrb, "o", &orig);
+  fptr_copy = DATA_PTR(copy);
+  if (fptr_copy != NULL) {
+    fptr_finalize(mrb, fptr_copy, 0);
+    mrb_free(mrb, fptr_copy);
+  }
+  fptr_copy = mrb_io_alloc(mrb);
+  fptr_orig = DATA_PTR(orig);
+
+  buf = mrb_iv_get(mrb, orig, mrb_intern_cstr(mrb, "@buf"));
+  pos = mrb_iv_get(mrb, orig, mrb_intern_cstr(mrb, "@pos"));
+  mrb_iv_set(mrb, copy, mrb_intern_cstr(mrb, "@buf"), buf);
+  mrb_iv_set(mrb, copy, mrb_intern_cstr(mrb, "@pos"), pos);
+
+  fptr_copy->fd = mrb_dup(mrb, fptr_orig->fd);
+  fptr_copy->fd2 = mrb_dup(mrb, fptr_orig->fd2);
+  fptr_copy->pid = fptr_orig->pid;
+  fptr_copy->writable = fptr_orig->writable;
+  fptr_copy->sync = fptr_orig->sync;
+
+  DATA_TYPE(copy) = &mrb_io_type;
+  DATA_PTR(copy) = fptr_copy;
+
+  return copy;
+}
+
 static void
 fptr_finalize(mrb_state *mrb, struct mrb_io *fptr, int noraise)
 {
@@ -745,7 +793,7 @@ mrb_io_close_on_exec_p(mrb_state *mrb, mrb_value io)
 #if defined(F_GETFD) && defined(F_SETFD) && defined(FD_CLOEXEC)
   struct mrb_io *fptr;
   int ret;
-  
+
   fptr = (struct mrb_io *)mrb_get_datatype(mrb, io, &mrb_io_type);
   if (fptr->fd < 0) {
     mrb_raise(mrb, E_IO_ERROR, "closed stream");
@@ -787,7 +835,7 @@ mrb_io_set_close_on_exec(mrb_state *mrb, mrb_value io)
     if ((ret & FD_CLOEXEC) != flag) {
       ret = (ret & ~FD_CLOEXEC) | flag;
       ret = fcntl(fptr->fd2, F_SETFD, ret);
-      
+
       if (ret == -1) mrb_sys_fail(mrb, "F_SETFD failed");
     }
   }
@@ -851,6 +899,7 @@ mrb_init_io(mrb_state *mrb)
   mrb_define_class_method(mrb, io, "sysopen", mrb_io_s_sysopen, MRB_ARGS_ANY());
 
   mrb_define_method(mrb, io, "initialize", mrb_io_initialize, MRB_ARGS_ANY());    /* 15.2.20.5.21 (x)*/
+  mrb_define_method(mrb, io, "initialize_copy", mrb_io_initialize_copy, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, io, "sync",       mrb_io_sync,       MRB_ARGS_NONE());
   mrb_define_method(mrb, io, "sync=",      mrb_io_set_sync,   MRB_ARGS_REQ(1));
   mrb_define_method(mrb, io, "sysread",    mrb_io_sysread,    MRB_ARGS_ANY());

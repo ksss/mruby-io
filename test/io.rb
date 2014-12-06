@@ -150,6 +150,35 @@ assert('IO#write', '15.2.20.5.20') do
   true
 end
 
+assert('IO#dup for readable') do
+  io = IO.new(IO.sysopen($mrbtest_io_rfname))
+  dup = io.dup
+  assert_true io != dup
+  assert_true io.fileno != dup.fileno
+  assert_equal 'm', dup.sysread(1)
+  assert_equal 'r', io.sysread(1)
+  assert_equal 'u', dup.sysread(1)
+  assert_equal 'b', io.sysread(1)
+  assert_equal 'y', dup.sysread(1)
+  dup.close
+  assert_false io.closed?
+  io.close
+  true
+end
+
+assert('IO#dup for writable') do
+  io = IO.open(IO.sysopen($mrbtest_io_wfname, 'w+'), 'w+')
+  dup = io.dup
+  io.syswrite "mruby"
+  assert_equal 5, dup.sysseek(0, IO::SEEK_CUR)
+  io.sysseek 0, IO::SEEK_SET
+  assert_equal 0, dup.sysseek(0, IO::SEEK_CUR)
+  assert_equal "mruby", dup.sysread(5)
+  dup.close
+  io.close
+  true
+end
+
 assert('IO.for_fd') do
   fd = IO.sysopen($mrbtest_io_rfname)
   io = IO.for_fd(fd)
@@ -362,10 +391,10 @@ assert('IO#fileno') do
   io.closed?
 end
 
-assert('IO#close_on_exec') do 
+assert('IO#close_on_exec') do
   fd = IO.sysopen $mrbtest_io_wfname, "w"
   io = IO.new fd, "w"
-  begin 
+  begin
     # IO.sysopen opens a file descripter without O_CLOEXEC flag.
     assert_equal(false, io.close_on_exec?)
   rescue ScriptError
@@ -378,12 +407,12 @@ assert('IO#close_on_exec') do
   assert_equal(false, io.close_on_exec?)
   io.close_on_exec = true
   assert_equal(true, io.close_on_exec?)
-  
+
   io.close
   io.closed?
 
   # # Use below when IO.pipe is implemented.
-  # begin 
+  # begin
   #   r, w = IO.pipe
   #   assert_equal(false, r.close_on_exec?)
   #   r.close_on_exec = true
